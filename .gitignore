@@ -1,0 +1,9 @@
+poky/build/
+
+poky/
+meta-raspberrypid/
+meta-openembedded/
+
+.DS_Store
+*.swp
+
