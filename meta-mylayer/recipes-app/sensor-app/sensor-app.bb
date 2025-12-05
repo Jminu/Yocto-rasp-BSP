@@ -1,4 +1,5 @@
 SUMMARY = "Sensor Monitoring App"
+LICENSE = "GPL-2.0-only"
 
 S = "${WORKDIR}"
 

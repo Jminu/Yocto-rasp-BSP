@@ -1,4 +1,5 @@
 SUMMARY = "Device Tree for Sensor System"
+LICENSE = "GPL-2.0-only"
 
 SRC_URI = "\
     file://jmw-hd44780.dts \
