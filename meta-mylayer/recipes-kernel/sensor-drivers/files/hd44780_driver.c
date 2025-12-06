@@ -183,7 +183,8 @@ static void lcd_init(struct i2c_client *client) {
 static void lcd_print(struct i2c_client *client, const char *str, int len) {
 	printk(KERN_INFO "strlen: %d\n", len);
 
-	for (int i = 0; i < 16; i++) {
+	int i = 0;
+	for (i = 0; i < 16; i++) {
 		if (*str == '\0') {
 			lcd_write_data(client, ' ');
 			continue;
@@ -252,7 +253,7 @@ static int hd44780_probe(struct i2c_client *client) {
 		return -1;
 	}
 
-	hd44780->class = class_create(CLASS_NAME);
+	hd44780->class = class_create(THIS_MODULE, CLASS_NAME);
 	device_create(hd44780->class, NULL, hd44780->dev_num, NULL, DEVICE_NAME);
 
 	printk(KERN_INFO "probe success\n");

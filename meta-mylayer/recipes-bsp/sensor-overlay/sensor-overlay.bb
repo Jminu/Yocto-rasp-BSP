@@ -1,19 +1,24 @@
 SUMMARY = "Device Tree for Sensor System"
 LICENSE = "GPL-2.0-only"
-LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/GPL-2.0-only;801f80980d171dd6425610833a22dbe6"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/GPL-2.0-only;md5=801f80980d171dd6425610833a22dbe6"
 
+# download source code
 SRC_URI = "\
     file://jmw-hd44780.dts \
     file://jmw-sht20.dts \
 "
 
-DEPENDS += "dtc-native"
+DEPENDS = "dtc-native"
 
 inherit deploy
 
+# WORKDIR: build process temp directory
+# S: downloaded source code path
+S = "${WORKDIR}"
+
 do_compile() {
-    dtc -@ -I dts -O dtb -o jmw-hd44780.dtbo jmw-hd44780.dts
-    dtc -@ -I dts -O dtb -o jmw-sht20.dtbo jmw-sht20.dts
+    dtc -@ -I dts -O dtb -o jmw-hd44780.dtbo ${S}/jmw-hd44780.dts
+    dtc -@ -I dts -O dtb -o jmw-sht20.dtbo ${S}/jmw-sht20.dts
 }
 
 do_install() {
@@ -29,3 +34,5 @@ do_deploy:append() {
         install -m 0644 ${B}/jmw-hd44780.dtbo ${DEPLOYDIR}/bcm2711-bootfiles/
         install -m 0644 ${B}/jmw-sht20.dtbo ${DEPLOYDIR}/bcm2711-bootfiles/
     }
+
+FILES_${PN} += "/boot/overlays/*"

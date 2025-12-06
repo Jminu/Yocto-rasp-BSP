@@ -75,7 +75,7 @@ static int make_chrdev(void) {
 		return -1;
 	}
 
-	class = class_create(CLASS_NAME);
+	class = class_create(THIS_MODULE, CLASS_NAME);
 	btn_dev = device_create(class, NULL, dev_num, NULL, DEVICE_NAME);
 
 	printk(KERN_INFO "create device success\n");

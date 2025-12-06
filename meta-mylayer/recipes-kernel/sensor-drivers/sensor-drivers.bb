@@ -1,10 +1,10 @@
 SUMMARY = "Custom Sensor Drivers By Jin Minu"
 LICENSE = "GPL-2.0-only"
-LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/GPL-2.0-only;801f80980d171dd6425610833a22dbe6"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/GPL-2.0-only;md5=801f80980d171dd6425610833a22dbe6"
 
 inherit module
 
-SRC_URI = "
+SRC_URI = "\
         file://Makefile \
         file://irq_btn_driver.c \
         file://sht20_driver.c \
@@ -13,7 +13,7 @@ SRC_URI = "
 
 S = "${WORKDIR}"
 
-KERNEL_MODULE_AUTOLOAD += "
+KERNEL_MODULE_AUTOLOAD += "\
         irq_btn_driver \
         sht20_driver \
         hd44780_driver \

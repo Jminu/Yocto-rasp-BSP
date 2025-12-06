@@ -172,7 +172,7 @@ static int sht20_probe(struct i2c_client *client) {
 		return -1;
 	}
 
-	sht20->class = class_create(CLASS_NAME);
+	sht20->class = class_create(THIS_MODULE, CLASS_NAME);
 	device_create(sht20->class, NULL, sht20->dev_num, NULL, DEVICE_NAME);
 
 	return 0;
