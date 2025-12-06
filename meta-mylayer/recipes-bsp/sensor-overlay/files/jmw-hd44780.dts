@@ -10,7 +10,7 @@
 		__overlay__ {
 			status = "okay";
 
-			hd44780: hd44780@27d
+			hd44780: hd44780@27
 			{
 				compatible = "jmw,hd44780";
 
