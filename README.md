@@ -34,10 +34,10 @@ meta-mylayer/
 
 | Category | Technology | Description |
 | :--- | :--- | :--- |
-| **Build System** | **Yocto Project** | Poky (Kirkstone branch), BitBake |
+| **Build System** | Yocto Project | Poky (Kirkstone branch), BitBake |
 | **Target HW** | Raspberry Pi 4B | 64-bit Architecture (bcm2711) |
-| **Kernel** | Linux Kernel Module | `inherit module`을 사용한 Out-of-tree 모듈 빌드 |
-| **Init System** | **Systemd** | 부팅 시 센서 모니터링 앱 자동 실행 서비스 등록 |
+| **Kernel** | Linux Kernel Module | `inherit module`을 사용 모듈 빌드 |
+| **Init System** | Systemd | 부팅 시 센서 모니터링 앱 자동 실행 서비스 등록 |
 | **Device Tree** | Device Tree Overlay | `dtc` 컴파일 및 `/boot/overlays` 자동 배포 |
 
 -----
