@@ -32,11 +32,11 @@ static struct sht20_device {
 };
 
 // 연관된 dtbo file을 찾기위함
-static const struct of_device_id sht20_ids[] = {
+static const struct of_device_id sht20_of_match[] = {
 	{.compatible = "jmw,sht20"}, // .dts와 일치
 	{},
 };
-MODULE_DEVICE_TABLE(of, sht20_ids);
+MODULE_DEVICE_TABLE(of, sht20_of_match);
 
 /*
  * Do soft reset
@@ -141,7 +141,7 @@ static int sht20_probe(struct i2c_client *client, const struct i2c_device_id *id
 	int ret;
 
 	sht20 = devm_kzalloc(&client->dev, sizeof(struct sht20_device), GFP_KERNEL); // sht20을 위한 kernel공간 할당
-	if (sht20 == NULL) {
+	if (!sht20) {
 		printk(KERN_ERR "devm_kzalloc fail\n");
 		return -1;
 	}
@@ -192,7 +192,7 @@ static int sht20_remove(struct i2c_client *client) {
 static struct i2c_driver sht20_driver = {
 	.driver = {
 		.name = "jmw_sht20",
-		.of_match_table = sht20_ids,
+		.of_match_table = sht20_of_match,
 	},
 	.probe = sht20_probe,
 	.remove = sht20_remove,
