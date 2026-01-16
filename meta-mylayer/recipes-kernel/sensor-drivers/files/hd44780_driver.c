@@ -15,7 +15,48 @@
 #define CLASS_NAME "hd44780_class"
 
 /*
- * i2c address: 0100 A2 A1 A0 -> 0x27
+ * ----- Expander for I2C bus -----
+ * I2C slave address: 0100 A2 A1 A0 -> 0x27
+ * Write mode: 0
+ * Read mode: 1
+ *
+ * 총 3바이트에서 1바이트는 slave + address 이고
+ * 나머지 2바이트는 데이터.
+ */
+
+/*
+ * ----- LCD Moudle -----
+ * E: Data Enable
+ * 8 bit mode: DB0 ~ DB7 use
+ * 4 bit mode: DB4 ~ DB7 use
+ *
+ * 기본 세팅
+ * N=1: 2-line display
+ * F=0: 5x8 dots font
+ * D=1: display on
+ * 위의 세팅은 LCD모듈이 켜질때, 명령을 내려야한다.
+ *
+ * LCD모듈에 전원이 인가되면, reset 루틴을 자동적으로 실행한다.
+ * 이것은 약 50ms 정도가 걸린다. 이 reset 루틴 후,
+ * LCD 모듈의 상태는 다음과 같이 된다.
+ *
+ * Display clear
+ * DL=1: 8bit interface
+ * N=0: 1-line display
+ * F=0: 5x8 dot char display
+ * D=0: Display off
+ * C=0: Cursor off
+ * B=0: Blinking off
+ * I/D=1: Increment by 1
+ * S=0: No Shift
+ */
+
+/*
+ * 
+
+ *
+ *
+ * ----------------------------------------------------------------------------
  *
  * RS: select register
  * 	- 0: transferring instruction data
@@ -70,6 +111,7 @@
  * 1 |1|0 |1
  *
  */
+
 #define RS (1 << 0)
 #define RW (0 << 1) // write만 할거임
 #define E (1 << 2) // 펄스
@@ -89,11 +131,11 @@ static struct hd44780_device {
 	struct class *class;
 };
 
-static const struct of_device_id hd44780_ids[] = {
+static const struct of_device_id hd44780_of_match[] = {
 	{.compatible = "jmw,hd44780"},
 	{},
 };
-MODULE_DEVICE_TABLE(of, hd44780_ids);
+MODULE_DEVICE_TABLE(of, hd44780_of_match);
 
 static int i2c_lcd_write_byte(struct i2c_client *client, u8 byte) { // u8: unsigned char
 	int ret;
@@ -117,7 +159,7 @@ static int i2c_lcd_write_byte(struct i2c_client *client, u8 byte) { // u8: unsig
 static void lcd_send_nibble(struct i2c_client *client, u8 data, u8 mode) {
 	u8 byte_no_e = data | BL | mode;
 	u8 byte_with_e = data | BL | E | mode;
-	
+
 	i2c_lcd_write_byte(client, byte_no_e); // 펄스 없는 바이트 보냄
 	udelay(10);
 
@@ -146,9 +188,9 @@ static void lcd_write_cmd(struct i2c_client *client, u8 cmd) {
 	lcd_send_byte(client, cmd, 0x00); // 0x00: RS=0
 }
 
-/* 
+/*
  * @client: i2c slave 주소 (0x27)
- * @data: write할 데이터 
+ * @data: write할 데이터
  */
 static void lcd_write_data(struct i2c_client *client, char data) {
 	lcd_send_byte(client, data, RS); // 0x01: RS=1
@@ -168,14 +210,13 @@ static void lcd_init(struct i2c_client *client) {
 
 
 	lcd_send_nibble(client, 0x20, 0x00);
-	udelay(100);	
+	udelay(100);
 	printk(KERN_INFO "4비트 모드로 변경\n");
 
 	lcd_write_cmd(client, LCD_FUNCTIONSET);
 	lcd_write_cmd(client, LCD_DISPLAYON); // display on
 	lcd_write_cmd(client, LCD_CLEARDISPLAY); // 화면 지움
 	lcd_write_cmd(client, LCD_ENTRYMODESET); // 커서 우측 이동
-	
 
 	printk(KERN_INFO "lcd init success\n");
 }
@@ -268,7 +309,7 @@ static int hd44780_probe(struct i2c_client *client, const struct i2c_device_id *
 
 static int  hd44780_remove(struct i2c_client *client) {
 	struct hd44780_device *hd44780 = i2c_get_clientdata(client);
-	
+
 	device_destroy(hd44780->class, hd44780->dev_num);
 	class_destroy(hd44780->class);
 	cdev_del(&(hd44780->hd44780_cdev));
@@ -281,7 +322,7 @@ static int  hd44780_remove(struct i2c_client *client) {
 static struct i2c_driver hd44780_driver = {
 	.driver = {
 		.name = "jmw_hd44780",
-		.of_match_table = hd44780_ids,
+		.of_match_table = hd44780_of_match,
 	},
 	.probe = hd44780_probe,
 	.remove = hd44780_remove,
@@ -293,4 +334,3 @@ module_i2c_driver(hd44780_driver);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("JIN MINU");
 MODULE_DESCRIPTION("HD44780+extension module driver");
-
