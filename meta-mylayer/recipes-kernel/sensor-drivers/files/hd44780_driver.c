@@ -22,6 +22,8 @@
  *
  * 총 3바이트에서 1바이트는 slave + address 이고
  * 나머지 2바이트는 데이터.
+ *
+ * 확장모듈과 HD44780은 D7 D6 D5 D4가 연결되어있다.
  */
 
 /*
@@ -49,80 +51,30 @@
  * B=0: Blinking off
  * I/D=1: Increment by 1
  * S=0: No Shift
+ *
+ * 이것이 reset routine이다.
  */
 
-/*
- * 
-
- *
- *
- * ----------------------------------------------------------------------------
- *
- * RS: select register
- * 	- 0: transferring instruction data
- * 	- 1: transferring display data
- *
- * RW: select Write or Read
- * 	- 0: Write mode
- * 	- 1: Read mode (not used this driver)
- *
- * E: data enable
- *
- * DB4 ~ DB7: 상위 4비트
- * DB0 ~ DB3: 하위 4비트
- * 
- * 4비트 모드에서 상위 4비트만 사용, 하위 4비트 열어둠
- * 이때, 2번 읽는다.
- * 
- * D
- * 	- 0: display off
- * 	- 1: display on
- * 
- * C
- * 	- 0: cursor off
- * 	- 1: cursor on
- * 
- * B
- * 	- 0: cursor blink off
- * 	- 1: cursor blink on
- * 
- * DL
- * 	- 0: 4-bit interface
- * 	- 1: 8-bit interface
- * 
- * 
- * When turning on power supply, LCD module will execute reset routine automatically (takes 50ms)
- * After the reset routines, the LCD module status will be as follow.
- * 	- Display clear
- * 	- DL = 1
- * 	- N = 0
- * 	- F = 0
- * 	- D = 0
- * 	- C = 0
- * 	- B = 0
- * 	- I/D = 1
- * 	- S = 0
- * 	처음 전원 공급하면 다음과 같은 상태가 됨.
- */
-
-/*
- *
- * BL|E|RW|RS -> 하위 4비트에 들어감
- * 1 |1|0 |1
- *
- */
-
-#define RS (1 << 0)
-#define RW (0 << 1) // write만 할거임
+#define RS (1 << 0) // RS:0 명령, RS:1 데이터
+#define RW (0 << 1) // RW:0 write, RW:1 read, 근데 어차피 쓰기만 할거임
 #define E (1 << 2) // 펄스
 #define BL (1 << 3) // 백라이트
 
 #define LCD_CLEARDISPLAY 0x01
 #define LCD_RETURNHOME 0x02
-#define LCD_FUNCTIONSET 0x28
-#define LCD_DISPLAYON 0x0C
+#define LCD_FUNCTIONSET 0x28 //4bit mode, 2line set
+#define LCD_DISPLAYON 0xF // display on, cursor on, blink on
 #define LCD_DISPLAYOFF 0x08
 #define LCD_ENTRYMODESET 0x06
+
+#define MODE_8BIT 0x30
+#define MODE_4BIT 0x20
+
+#define WRITE_MODE 0
+#define READ_MODE 1
+
+#define INST_MODE 0
+#define DATA_MODE 1
 
 static struct hd44780_device {
 	struct i2c_client *client;
@@ -137,11 +89,10 @@ static const struct of_device_id hd44780_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, hd44780_of_match);
 
-static int i2c_lcd_write_byte(struct i2c_client *client, u8 byte) { // u8: unsigned char
+static int i2c_lcd_write_byte(struct i2c_client *client, u8 byte) {
 	int ret;
 
-	ret = i2c_smbus_write_byte(client, byte); // 상위 7비트: i2c slave주소, 하위 1비트 R/W 설정, -> i2c_write는 자동으로 하위 1비트를 W로 설정
-
+	ret = i2c_smbus_write_byte(client, byte);
 	if (ret < 0) {
 		printk(KERN_ERR "i2c write fail\n");
 		return -1;
@@ -152,13 +103,16 @@ static int i2c_lcd_write_byte(struct i2c_client *client, u8 byte) { // u8: unsig
 
 /*
  * 4비트(데이터)에 나머지 4비트(제어비트) 결합
+ * 4bit를 보낸다.
+ *
  * @mode: register set (RS)
  * 	- RS:0 명령 전송
  * 	- RS:1 데이터 전송
+ * nibble: 4bit
  */
 static void lcd_send_nibble(struct i2c_client *client, u8 data, u8 mode) {
-	u8 byte_no_e = data | BL | mode;
-	u8 byte_with_e = data | BL | E | mode;
+	u8 byte_no_e = data | BL | mode; // data|1|0|0|0
+	u8 byte_with_e = data | BL | E | mode; // data|1|1|0|0
 
 	i2c_lcd_write_byte(client, byte_no_e); // 펄스 없는 바이트 보냄
 	udelay(10);
@@ -171,66 +125,64 @@ static void lcd_send_nibble(struct i2c_client *client, u8 data, u8 mode) {
 }
 
 /*
- * 4bit 모드에서,
+ * 4bit 모드에서, 1바이트를 LCD에 보내는데, 4비트를 2번 보낸다.
  */
 static void lcd_send_byte(struct i2c_client *client, u8 data, u8 mode) {
-	lcd_send_nibble(client, data & 0xF0, mode); // 상위 4비트 보냄
-	lcd_send_nibble(client, (data << 4) & 0xF0, mode); // 하위 4비트 보냄
-}
-
-/*
- * lcd에 명령 전송-> 어떤 모드로 할지
- * ex) 4비트 모드-> 상위비트 0010 보냄
- * @client: i2c slave 주소 (0x27)
- * @cmd: 내릴 명령
- */
-static void lcd_write_cmd(struct i2c_client *client, u8 cmd) {
-	lcd_send_byte(client, cmd, 0x00); // 0x00: RS=0
+	lcd_send_nibble(client, data & 0xF0, mode); // D4~D7 send
+	lcd_send_nibble(client, (data << 4) & 0xF0, mode); // D0~D3 send
 }
 
 /*
  * @client: i2c slave 주소 (0x27)
  * @data: write할 데이터
  */
-static void lcd_write_data(struct i2c_client *client, char data) {
-	lcd_send_byte(client, data, RS); // 0x01: RS=1
+static void lcd_show_data(struct i2c_client *client, char data) {
+	lcd_send_byte(client, data, DATA_MODE); // 0x01: RS=1
 }
 
+/*
+ * 처음 LCD에 전원이 인가되면, 다음의 시퀀스를 따른다.
+ *
+ * @client: i2c slave의 주소 (0x27)
+ */
 static void lcd_init(struct i2c_client *client) {
-	msleep(50);
+	msleep(50); // 하드웨어 자동 리셋 대기
 
-	// 처음은 8비트 모드
-	lcd_send_nibble(client, 0x30, 0x00);
+	// 처음에는 8bit 모드
+	lcd_send_nibble(client, MODE_8BIT, INST_MODE); // 0x30: 0011 0000, 0x00: RS가 0(instruction mode)
 	msleep(10);
-	lcd_send_nibble(client, 0x30, 0x00);
+	lcd_send_nibble(client, MODE_8BIT, INST_MODE);
 	udelay(150);
-	lcd_send_nibble(client, 0x30, 0x00);
+	lcd_send_nibble(client, MODE_8BIT, INST_MODE);
 	udelay(150);
 	printk(KERN_INFO "8비트 모드로 변경\n");
 
-
-	lcd_send_nibble(client, 0x20, 0x00);
+	// 4bit 모드로 변경
+	lcd_send_nibble(client, MODE_4BIT, INST_MODE); // 0x20: 0010 0000, 0x00: RS가 0(instruction mode)
 	udelay(100);
+	lcd_send_nibble(client, MODE_4BIT, INST_MODE);
+	udelay(100);
+	lcd_send_nibble(client, MODE_4BIT, INST_MODE);
+	udelay(150);
 	printk(KERN_INFO "4비트 모드로 변경\n");
 
-	lcd_write_cmd(client, LCD_FUNCTIONSET);
-	lcd_write_cmd(client, LCD_DISPLAYON); // display on
-	lcd_write_cmd(client, LCD_CLEARDISPLAY); // 화면 지움
-	lcd_write_cmd(client, LCD_ENTRYMODESET); // 커서 우측 이동
+	lcd_send_byte(client, LCD_DISPLAYON, INST_MODE);
+	lcd_send_byte(client, LCD_CLEARDISPLAY, INST_MODE);
+	lcd_send_byte(client, LCD_ENTRYMODESET, INST_MODE);
 
-	printk(KERN_INFO "lcd init success\n");
+	printk(KERN_INFO "LCD init success\n");
 }
 
 static void lcd_print(struct i2c_client *client, const char *str, int len) {
-	printk(KERN_INFO "hd44780_driver.c: recived string length: %d\n", len);
+	printk(KERN_INFO "hd 처음에는 8bit 모드44780_driver.c: recived string length: %d\n", len);
 
 	int i = 0;
 	for (i = 0; i < 16; i++) {
 		if (*str == '\0') {
-			lcd_write_data(client, ' ');
+			lcd_show_data(client, ' ');
 			continue;
 		}
-		lcd_write_data(client, *str++);
+		lcd_show_data(client, *str++);
 	}
 }
 
@@ -329,7 +281,6 @@ static struct i2c_driver hd44780_driver = {
 };
 
 module_i2c_driver(hd44780_driver);
-
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("JIN MINU");
