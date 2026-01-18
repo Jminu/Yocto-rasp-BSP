@@ -62,7 +62,8 @@
 
 #define LCD_CLEARDISPLAY 0x01
 #define LCD_RETURNHOME 0x02
-#define LCD_FUNCTIONSET 0x28 //4bit mode, 2line set
+#define LCD_FUNCTIONSET 0x28 // 4bit mode, 2line set
+#define LCD_FUNCTIONSET 0x20 // 4bit mode, 1line set
 #define LCD_DISPLAYON 0xF // display on, cursor on, blink on
 #define LCD_DISPLAYOFF 0x08
 #define LCD_ENTRYMODESET 0x06
@@ -111,16 +112,16 @@ static int i2c_lcd_write_byte(struct i2c_client *client, u8 byte) {
  * nibble: 4bit
  */
 static void lcd_send_nibble(struct i2c_client *client, u8 data, u8 mode) {
-	u8 byte_no_e = data | BL | mode; // data|1|0|0|0
-	u8 byte_with_e = data | BL | E | mode; // data|1|1|0|0
+	u8 byte_no_e = data | BL | mode;
+	u8 byte_with_e = data | BL | E | mode;
 
-	i2c_lcd_write_byte(client, byte_no_e); // 펄스 없는 바이트 보냄
+	i2c_lcd_write_byte(client, byte_no_e); // 펄스 없는 바이트
 	udelay(10);
 
-	i2c_lcd_write_byte(client, byte_with_e); // 펄스 있는 바이트 보냄
+	i2c_lcd_write_byte(client, byte_with_e); // 펄스 있는 바이트
 	udelay(10);
 
-	i2c_lcd_write_byte(client, byte_no_e); // 펄스 없는 바이트 보냄 -> 하강엣지에서 LCD에 데이터가 들어가게됨
+	i2c_lcd_write_byte(client, byte_no_e); // 펄스 없는 바이트->하강엣지에서 LCD에 데이터가 들어가게됨
 	udelay(50);
 }
 
@@ -160,13 +161,9 @@ static void lcd_init(struct i2c_client *client) {
 	// 4bit 모드로 변경
 	lcd_send_nibble(client, MODE_4BIT, INST_MODE); // 0x20: 0010 0000, 0x00: RS가 0(instruction mode)
 	udelay(100);
-	lcd_send_nibble(client, MODE_4BIT, INST_MODE);
-	udelay(100);
-	lcd_send_nibble(client, MODE_4BIT, INST_MODE);
-	udelay(150);
 	printk(KERN_INFO "4비트 모드로 변경\n");
 
-	lcd_send_byte(client, LCD_DISPLAYON, INST_MODE);
+	lcd_send_byte(client, LCD_DISPLAON, INST_MODE);
 	lcd_send_byte(client, LCD_CLEARDISPLAY, INST_MODE);
 	lcd_send_byte(client, LCD_ENTRYMODESET, INST_MODE);
 
@@ -174,7 +171,7 @@ static void lcd_init(struct i2c_client *client) {
 }
 
 static void lcd_print(struct i2c_client *client, const char *str, int len) {
-	printk(KERN_INFO "hd 처음에는 8bit 모드44780_driver.c: recived string length: %d\n", len);
+	printk(KERN_INFO "Recived string length: %d\n", len);
 
 	int i = 0;
 	for (i = 0; i < 16; i++) {
@@ -201,7 +198,7 @@ static ssize_t hd44780_write(struct file *file, const char __user *buf, size_t l
 
 	kbuf[len] = '\0';
 
-	lcd_write_cmd(hd44780->client, LCD_CLEARDISPLAY);
+	lcd_send_byte(hd44780->client, LCD_CLEARDISPLAY, INST_MODE);
 	lcd_print(hd44780->client, kbuf, strlen(kbuf));
 
 	return len;
@@ -227,7 +224,7 @@ static int hd44780_probe(struct i2c_client *client, const struct i2c_device_id *
 	int ret;
 
 	hd44780 = devm_kzalloc(&client->dev, sizeof(struct hd44780_device), GFP_KERNEL);
-	if (hd44780 < 0) {
+	if (!hd44780) {
 		printk(KERN_ERR "devm kzalloc fail\n");
 		return -1;
 	}
