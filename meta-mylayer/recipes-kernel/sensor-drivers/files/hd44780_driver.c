@@ -163,7 +163,7 @@ static void lcd_init(struct i2c_client *client) {
 	udelay(100);
 	printk(KERN_INFO "4비트 모드로 변경\n");
 
-	lcd_send_byte(client, LCD_DISPLAON, INST_MODE);
+	lcd_send_byte(client, LCD_DISPLAYON, INST_MODE);
 	lcd_send_byte(client, LCD_CLEARDISPLAY, INST_MODE);
 	lcd_send_byte(client, LCD_ENTRYMODESET, INST_MODE);
 
